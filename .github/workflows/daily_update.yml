@@ -1,0 +1,77 @@
+name: Daily RSS Update
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # UTC 02:00 = 北京时间 10:00
+  workflow_dispatch:        # 允许在 GitHub Actions 页面手动触发
+
+jobs:
+  update-feed:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # 允许 push 回仓库
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # 缓存 SQLite 数据库，避免每次重新抓取和分类所有文章
+      - name: Restore database cache
+        uses: actions/cache@v4
+        with:
+          path: data/articles.sqlite
+          key: articles-db-${{ github.run_id }}
+          restore-keys: articles-db-
+
+      - name: Create .env
+        run: |
+          cat > .env << 'EOF'
+          LLM_PROVIDER=openai
+          LLM_MODEL=gpt-4o-mini
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          MAX_ARTICLES_PER_RUN=400
+          EOF
+
+      - name: Create feeds.yaml (public feeds + private wechat)
+        run: |
+          cp config/feeds_public.yaml config/feeds.yaml
+          # 如果设置了微信 RSS secret，追加微信 feed
+          if [ -n "${{ secrets.WECHAT_RSS_URL }}" ]; then
+            cat >> config/feeds.yaml << 'EOF'
+          - source_id: wechat_all
+            name: 微信公众号合集
+            url: WECHAT_URL_PLACEHOLDER
+            source_type: wechat
+            source_quality_score: 0.82
+            language: zh
+            region_scope: china
+            primary_topic_hint: T01
+            topic_hints: T01;T03;T17
+            enabled: true
+            notes: 个人微信公众号订阅合集
+            priority_group: normal
+          EOF
+            # 替换占位符为真实 URL
+            sed -i "s|WECHAT_URL_PLACEHOLDER|${{ secrets.WECHAT_RSS_URL }}|" config/feeds.yaml
+          fi
+
+      - name: Run pipeline
+        run: python -m src.main run
+
+      - name: Commit and push docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/
+          # 只有 docs/ 有变化才提交
+          git diff --staged --quiet || git commit -m "chore: update feed $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push

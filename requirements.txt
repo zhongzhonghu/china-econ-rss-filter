@@ -1,0 +1,14 @@
+feedparser
+requests
+beautifulsoup4
+readability-lxml
+trafilatura
+pyyaml
+python-dotenv
+pydantic
+openai
+anthropic
+pandas
+openpyxl
+rapidfuzz
+pytest

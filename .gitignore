@@ -1,0 +1,44 @@
+# Environment
+.env
+
+# Database (local data)
+data/articles.sqlite
+data/*.sqlite
+
+# User's private Excel source list (keep template)
+config/rss_sources.xlsx
+# Auto-generated from xlsx; may contain private tokens
+config/feeds.yaml
+
+# Generated outputs (regenerated each run)
+output/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+.claude/
