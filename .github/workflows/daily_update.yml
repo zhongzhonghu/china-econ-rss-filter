@@ -33,36 +33,47 @@ jobs:
           restore-keys: articles-db-
 
       - name: Create .env
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          cat > .env << 'EOF'
+          cat > .env << EOF
           LLM_PROVIDER=openai
           LLM_MODEL=gpt-4o-mini
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_KEY=${OPENAI_API_KEY}
           MAX_ARTICLES_PER_RUN=400
           EOF
 
       - name: Create feeds.yaml (public feeds + private wechat)
+        env:
+          WECHAT_RSS_URL: ${{ secrets.WECHAT_RSS_URL }}
         run: |
           cp config/feeds_public.yaml config/feeds.yaml
-          # 如果设置了微信 RSS secret，追加微信 feed
-          if [ -n "${{ secrets.WECHAT_RSS_URL }}" ]; then
-            cat >> config/feeds.yaml << 'EOF'
-          - source_id: wechat_all
-            name: 微信公众号合集
-            url: WECHAT_URL_PLACEHOLDER
-            source_type: wechat
-            source_quality_score: 0.82
-            language: zh
-            region_scope: china
-            primary_topic_hint: T01
-            topic_hints: T01;T03;T17
-            enabled: true
-            notes: 个人微信公众号订阅合集
-            priority_group: normal
-          EOF
-            # 替换占位符为真实 URL
-            sed -i "s|WECHAT_URL_PLACEHOLDER|${{ secrets.WECHAT_RSS_URL }}|" config/feeds.yaml
-          fi
+          python - << 'PYEOF'
+          import os, yaml
+          url = os.environ.get('WECHAT_RSS_URL', '').strip()
+          if not url:
+              print("No WECHAT_RSS_URL secret, skipping wechat feed")
+          else:
+              with open('config/feeds.yaml', 'r') as f:
+                  data = yaml.safe_load(f)
+              data['feeds'].append({
+                  'source_id': 'wechat_all',
+                  'name': '微信公众号合集',
+                  'url': url,
+                  'source_type': 'wechat',
+                  'source_quality_score': 0.82,
+                  'language': 'zh',
+                  'region_scope': 'china',
+                  'primary_topic_hint': 'T01',
+                  'topic_hints': 'T01;T03;T17',
+                  'enabled': True,
+                  'notes': '个人微信公众号订阅合集',
+                  'priority_group': 'normal',
+              })
+              with open('config/feeds.yaml', 'w') as f:
+                  yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
+              print(f"Wechat feed added: {url[:50]}...")
+          PYEOF
 
       - name: Run pipeline
         run: python -m src.main run
