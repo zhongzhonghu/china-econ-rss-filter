@@ -76,7 +76,13 @@ jobs:
           PYEOF
 
       - name: Run pipeline
-        run: python -m src.main run
+        # 跳过 import-sources（feeds.yaml 已由上一步生成），直接从 fetch 开始
+        run: |
+          python -m src.main fetch
+          python -m src.main classify
+          python -m src.main digest
+          python -m src.main feed
+          python -m src.main publish-assets
 
       - name: Commit and push docs
         run: |
